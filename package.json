@@ -1,0 +1,22 @@
+{
+  "name": "syth-vite",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "E2B_PORT=3002 concurrently \"node server/e2b-server.mjs\" \"vite --host 0.0.0.0\"",
+    "dev:client": "vite --host 0.0.0.0",
+    "dev:server": "E2B_PORT=3002 node server/e2b-server.mjs",
+    "build": "vite build",
+    "vercel-build": "vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "start": "vite --host 0.0.0.0"
+  },
+  "dependencies": {
+    "@e2b/code-interpreter": "^2.8.0",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1",
+    "vite": "^5.4.10"
+  }
+}
