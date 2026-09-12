@@ -1,43 +1,14 @@
 import './style.css';
-
-function loadScript(src) {
-  return new Promise((resolve, reject) => {
-    const existing = document.querySelector(`script[src="${src}"]`);
-    if (existing) {
-      if (existing.dataset.loaded === 'true') return resolve();
-      existing.addEventListener('load', () => resolve(), { once: true });
-      existing.addEventListener('error', () => reject(new Error(`Failed to load ${src}`)), { once: true });
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = src;
-    script.async = false;
-    script.onload = () => {
-      script.dataset.loaded = 'true';
-      resolve();
-    };
-    script.onerror = () => reject(new Error(`Failed to load ${src}`));
-    document.body.appendChild(script);
-  });
-}
+import '../js/api.js';
+import '../js/ui.js';
+import '../js/map.js';
+import '../js/files.js';
+import '../js/charts.js';
+import '../js/export.js';
+import '../js/agent.js';
+import '../js/app.js';
 
 async function bootLegacyApp() {
-  const scripts = [
-    '/public/js/api.js',
-    '/public/js/ui.js',
-    '/public/js/map.js',
-    '/public/js/files.js',
-    '/public/js/charts.js',
-    '/public/js/export.js',
-    '/public/js/agent.js',
-    '/public/js/app.js',
-  ];
-
-  for (const src of scripts) {
-    await loadScript(src);
-  }
-
   const root = document.querySelector('#app');
   if (!root) return;
 
