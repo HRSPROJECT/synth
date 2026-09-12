@@ -24,14 +24,14 @@ function loadScript(src) {
 
 async function bootLegacyApp() {
   const scripts = [
-    '/js/api.js',
-    '/js/ui.js',
-    '/js/map.js',
-    '/js/files.js',
-    '/js/charts.js',
-    '/js/export.js',
-    '/js/agent.js',
-    '/js/app.js',
+    '/public/js/api.js',
+    '/public/js/ui.js',
+    '/public/js/map.js',
+    '/public/js/files.js',
+    '/public/js/charts.js',
+    '/public/js/export.js',
+    '/public/js/agent.js',
+    '/public/js/app.js',
   ];
 
   for (const src of scripts) {
@@ -49,7 +49,7 @@ async function bootLegacyApp() {
       <div id="apiModal">
         <div class="modal-box">
           <div class="modal-logo">
-            <span class="syth-name">SYTH</span>
+            <span class="syth-name">SYNTH</span>
             <span class="syth-sub">Universal Digital Experimentation Platform</span>
           </div>
           <p class="modal-desc">Transform real-world questions into evidence-driven discoveries powered by AI, live web research, and computational simulation.</p>
@@ -95,12 +95,12 @@ async function bootLegacyApp() {
             </label>
             <button class="btn-clear-keys" id="btnClearKeys">🗑 Clear saved</button>
           </div>
-          <button class="btn-launch" id="btnLaunch">⚗ Launch SYTH</button>
+          <button class="btn-launch" id="btnLaunch">⚗ Launch SYNTH</button>
         </div>
       </div>
 
       <header>
-        <div class="logo">SYTH <span>Experimentation Platform</span></div>
+        <div class="logo">SYNTH <span>Experimentation Platform</span></div>
         <div class="header-right">
           <div class="header-status">
             <div class="status-dot" id="statusDot"></div>
@@ -181,8 +181,8 @@ async function bootLegacyApp() {
         <div class="welcome-hero" id="welcomeHero">
           <div class="welcome-glow"></div>
           <div class="welcome-icon">⚗</div>
-          <h1 class="welcome-title">Welcome to SYTH</h1>
-          <p class="welcome-sub">Ask a question. Attach files. Mark locations on a map.<br/>SYTH's AI agent will plan, research, compute, simulate, and generate a full evidence report — all on one continuous living page.</p>
+          <h1 class="welcome-title">Welcome to SYNTH</h1>
+          <p class="welcome-sub">Ask a question. Attach files. Mark locations on a map.<br/>SYNTH's AI agent will plan, research, compute, simulate, and generate a full evidence report — all on one continuous living page.</p>
           <div class="feature-grid">
             <div class="feature-card"><div class="fc-icon">🧠</div><div>Hypothesis Generation</div></div>
             <div class="feature-card"><div class="fc-icon">🔍</div><div>Live Web Research</div></div>
