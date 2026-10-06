@@ -17,7 +17,7 @@ let _abort = false;
 let currentExperiment = null;
 const MAX_LOOPS = 12;   // safety cap — agent can do up to 12 action rounds
 
-function stopExperiment() {
+export function stopExperiment() {
   _abort = true;
   setStatus('Stopped', false);
   setRunning(false);
@@ -44,7 +44,7 @@ const TOOLS = {
 /* ══════════════════════════════════════════════
    MAIN ENTRY
 ══════════════════════════════════════════════ */
-async function runExperiment(query, domain) {
+export async function runExperiment(query, domain) {
   if (!query.trim())     { showNotif('Enter a research question', 'error'); return; }
   if (!getActiveAiKey()) { showNotif('Configure API keys first', 'error'); return; }
 
