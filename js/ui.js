@@ -7,7 +7,7 @@
 
 /* ── NOTIFICATION ─────────────────────────────────────────────────── */
 let _notifTimer = null;
-export function showNotif(msg, type = 'info', dur = 3500) {
+function showNotif(msg, type = 'info', dur = 3500) {
   const el = document.getElementById('notif');
   if (!el) return;
   el.textContent = msg;
@@ -105,6 +105,9 @@ function addSection(id, iconType, iconEmoji, title, cardClass = '') {
     sectionEl: sec,
     bodyEl,
     setDone(metaText = '') {
+      if (bodyEl && !bodyEl.textContent.trim() && !bodyEl.querySelector('img, canvas, svg, iframe')) {
+        bodyEl.innerHTML = '<span class="empty-state">No content was returned for this section. Try again or choose a different AI model.</span>';
+      }
       statusEl.className = 'section-status done';
       statusEl.innerHTML = '✓ Done';
       if (metaText) metaEl.textContent = metaText;
@@ -225,7 +228,7 @@ function buildSearchHTML(data) {
 }
 
 /* ── PARTICLES ───────────────────────────────────────────────────── */
-export function initParticles() {
+function initParticles() {
   const c = document.getElementById('particles');
   if (!c) return;
   for (let i = 0; i < 22; i++) {

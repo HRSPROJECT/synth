@@ -15,7 +15,7 @@ if (typeof pdfjsLib !== 'undefined') {
 }
 
 /* ── PUBLIC: add files from FileList ─────────────────────────────── */
-export async function addFiles(fileList) {
+async function addFiles(fileList) {
   const promises = Array.from(fileList).map(f => _readFile(f));
   const results  = await Promise.allSettled(promises);
   results.forEach(r => { if (r.status === 'fulfilled' && r.value) _uploadedFiles.push(r.value); });

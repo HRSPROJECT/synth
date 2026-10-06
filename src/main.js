@@ -1,12 +1,25 @@
 import './style.css';
-import '../js/api.js';
-import '../js/ui.js';
-import '../js/map.js';
-import '../js/files.js';
-import '../js/charts.js';
-import '../js/export.js';
-import '../js/agent.js';
-import '../js/app.js';
+
+const legacyScripts = [
+  '/js/api.js',
+  '/js/ui.js',
+  '/js/map.js',
+  '/js/files.js',
+  '/js/charts.js',
+  '/js/export.js',
+  '/js/agent.js',
+  '/js/app.js',
+];
+
+function loadLegacyScripts() {
+  return legacyScripts.reduce((chain, src) => chain.then(() => new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = src;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error(`Failed to load ${src}`));
+    document.head.appendChild(script);
+  })), Promise.resolve());
+}
 
 async function bootLegacyApp() {
   const root = document.querySelector('#app');
@@ -27,7 +40,6 @@ async function bootLegacyApp() {
           <div class="api-badges">
             <span class="api-badge badge-gemini">✦ Gemini</span>
             <span class="api-badge badge-tavily">🔍 Tavily</span>
-            <span class="api-badge badge-e2b">⌗ E2B</span>
           </div>
 
           <div class="api-field">
@@ -54,11 +66,6 @@ async function bootLegacyApp() {
             <label>Tavily API Key</label>
             <input type="password" id="tavilyKey" placeholder="tvly-..." autocomplete="off"/>
           </div>
-          <div class="api-field">
-            <label>E2B API Key</label>
-            <input type="password" id="e2bKey" placeholder="e2b_..." autocomplete="off"/>
-          </div>
-
           <div class="remember-row">
             <label class="remember-label">
               <input type="checkbox" id="rememberKeys" checked/>
@@ -172,6 +179,8 @@ async function bootLegacyApp() {
   document.dispatchEvent(new Event('DOMContentLoaded'));
 }
 
-bootLegacyApp().catch((error) => {
-  console.error('SYTH boot failed:', error);
-});
+loadLegacyScripts()
+  .then(bootLegacyApp)
+  .catch((error) => {
+    console.error('SYTH boot failed:', error);
+  });

@@ -13,7 +13,7 @@ let _annotations = [];   // { type, latlng, note, id, placeName, district, state
 let _annId       = 0;
 
 /* ── INIT INPUT MAP ─────────────────────────────────────────────── */
-export function initInputMap() {
+function initInputMap() {
   if (_inputMap) return;
   // Default center: India
   _inputMap = L.map('inputMap', { zoomControl: true }).setView([20.5937, 78.9629], 5);
@@ -24,7 +24,7 @@ export function initInputMap() {
   setTimeout(() => _inputMap.invalidateSize(), 150);
 }
 
-export function setMapTool(tool) {
+function setMapTool(tool) {
   _activeTool = tool;
   const hints = {
     marker: '📍 Click to drop a location marker',
@@ -35,7 +35,7 @@ export function setMapTool(tool) {
   if (el) el.textContent = hints[tool] || 'Click on the map';
 }
 
-export function clearMapAnnotations() {
+function clearMapAnnotations() {
   _annotations = [];
   _inputMap?.eachLayer(l => { if (l._sythAnn) _inputMap.removeLayer(l); });
   _renderAnnotationList();
@@ -298,6 +298,6 @@ function _calcZoom(lats, lngs) {
   return 6;
 }
 
-export function invalidateInputMap() {
+function invalidateInputMap() {
   setTimeout(() => _inputMap?.invalidateSize(), 200);
 }

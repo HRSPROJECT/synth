@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "E2B_PORT=3002 concurrently \"node server/e2b-server.mjs\" \"vite --host 0.0.0.0\"",
+    "dev": "concurrently \"node server/e2b-server.mjs\" \"vite --host 0.0.0.0\"",
     "dev:client": "vite --host 0.0.0.0",
     "dev:server": "E2B_PORT=3002 node server/e2b-server.mjs",
     "build": "vite build",

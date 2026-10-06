@@ -105,6 +105,9 @@ function addSection(id, iconType, iconEmoji, title, cardClass = '') {
     sectionEl: sec,
     bodyEl,
     setDone(metaText = '') {
+      if (bodyEl && !bodyEl.textContent.trim() && !bodyEl.querySelector('img, canvas, svg, iframe')) {
+        bodyEl.innerHTML = '<span class="empty-state">No content was returned for this section. Try again or choose a different AI model.</span>';
+      }
       statusEl.className = 'section-status done';
       statusEl.innerHTML = '✓ Done';
       if (metaText) metaEl.textContent = metaText;

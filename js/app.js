@@ -6,13 +6,6 @@
    ═══════════════════════════════════════════════ */
 'use strict';
 
-import { setKeys, getActiveModel, SYTH_KEYS, getActiveAiKey } from './api.js';
-import { showNotif, initParticles } from './ui.js';
-import { initInputMap, invalidateInputMap, setMapTool, clearMapAnnotations } from './map.js';
-import { addFiles } from './files.js';
-import { exportPDF, exportTXT, exportDOCX } from './export.js';
-import { runExperiment, stopExperiment } from './agent.js';
-
 const LS_KEY = 'syth_api_keys_v3';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -37,7 +30,7 @@ function _loadSavedKeys() {
     const { gemini='', tavily='', e2b='', model='gemini-2.5-flash', provider='gemini', openrouter='' } = JSON.parse(raw);
     const selectedProvider = provider === 'openrouter' ? 'openrouter' : 'gemini';
     const aiKey = selectedProvider === 'openrouter' ? openrouter : gemini;
-    if (!aiKey || !tavily || !e2b) return;
+    if (!aiKey || !tavily) return;
     _setInput('geminiKey', gemini);
     _setInput('openrouterKey', openrouter);
     _setInput('tavilyKey', tavily);
@@ -91,9 +84,14 @@ function _handleLaunch() {
   const e2b    = document.getElementById('e2bKey')?.value.trim()||'';
   const model  = document.getElementById('geminiModel')?.value || (provider === 'openrouter' ? 'poolside/laguna-s-2.1:free' : 'gemini-2.5-flash');
   const activeAiKey = provider === 'openrouter' ? openrouter : gemini;
-  if (!activeAiKey) { showNotif(`${provider === 'openrouter' ? 'OpenRouter' : 'Gemini'} API key required`, 'error'); return; }
-  if (!tavily) { showNotif('Tavily API key required','error'); return; }
-  if (!e2b)    { showNotif('E2B API key required','error');    return; }
+  if (!activeAiKey) {
+    showNotif(`${provider === 'openrouter' ? 'OpenRouter' : 'Gemini'} API key required`, 'error');
+    return;
+  }
+  if (!tavily) {
+    showNotif('Tavily API key required', 'error');
+    return;
+  }
   setKeys(gemini, tavily, e2b, model, provider, openrouter);
   const remember = document.getElementById('rememberKeys')?.checked ?? true;
   if (remember) { _saveKeys(gemini, tavily, e2b, model, provider, openrouter); showNotif('SYTH launched! Keys saved.','success'); }
@@ -189,11 +187,10 @@ function _bindInputPanel() {
 }
 
 async function _handleRun() {
-  if (!getActiveAiKey()) { showNotif('Configure API keys first','error'); showApiModal(); return; }
   const query  = document.getElementById('userQuery')?.value.trim()||'';
   const active = document.querySelector('.domain-chip.active');
   const domain = active ? active.dataset.domain : 'General';
-  await runExperiment(query, domain);
+  await runExperiment(query || 'How can renewable energy improve community resilience?', domain);
 }
 
 /* ── KEYBOARD ─────────────────────────────────────────────────────── */
