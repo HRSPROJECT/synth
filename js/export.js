@@ -5,7 +5,7 @@
 'use strict';
 
 /* ── TXT EXPORT ──────────────────────────────────────────────────── */
-export function exportTXT() {
+function exportTXT() {
   if (!currentExperiment) { showNotif('Run an experiment first', 'error'); return; }
   const { query, domain, reportText, elapsed } = currentExperiment;
   const header = `SYTH — Research Report\n${'='.repeat(60)}\nQuestion: ${query}\nDomain:   ${domain}\nDate:     ${new Date().toLocaleDateString()}\nDuration: ${elapsed}\n${'='.repeat(60)}\n\n`;
@@ -15,7 +15,7 @@ export function exportTXT() {
 }
 
 /* ── PDF EXPORT ──────────────────────────────────────────────────── */
-export async function exportPDF() {
+async function exportPDF() {
   if (!currentExperiment) { showNotif('Run an experiment first', 'error'); return; }
   showNotif('Generating PDF…', 'info', 8000);
 
@@ -113,7 +113,7 @@ export async function exportPDF() {
 }
 
 /* ── DOCX EXPORT (HTML → blob) ───────────────────────────────────── */
-export function exportDOCX() {
+function exportDOCX() {
   if (!currentExperiment) { showNotif('Run an experiment first', 'error'); return; }
   const { query, domain, reportText, elapsed } = currentExperiment;
 

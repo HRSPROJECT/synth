@@ -30,7 +30,7 @@ function stopExperiment() {
 ══════════════════════════════════════════════ */
 const TOOLS = {
   search:    { desc: 'Search the web via Tavily',                        fn: _toolSearch    },
-  code:      { desc: 'Write and execute Python or shell tasks in E2B',   fn: _toolCode      },
+  code:      { desc: 'Write and execute JavaScript directly in the browser', fn: _toolCode },
   analyze:   { desc: 'Deep analysis section grounded in actual results', fn: _toolAnalyze   },
   map:       { desc: 'Render a map simulation from data',               fn: _toolMap       },
   scenarios: { desc: 'Generate best/avg/worst/custom scenario cards',    fn: _toolScenarios },
@@ -80,6 +80,7 @@ async function runExperiment(query, domain) {
   try {
     // ── FIRST PLAN: agent decides the whole strategy ──
     const plan = await _agentPlan(memory);
+    plan.actions = _ensureDeepResearchActions(plan.actions, memory);
     _chk();
 
     // ── AUTONOMOUS LOOP ──────────────────────────────
@@ -133,7 +134,10 @@ async function runExperiment(query, domain) {
     removeThinkingBar();
     if (err.message !== '__ABORT__') {
       const s = addSection('error','report','✗','Agent Error');
-      s.bodyEl.innerHTML = `<span style="color:#ff4466">${escHtml(err.message)}</span>`;
+      const detail = /429|rate.?limit|temporarily rate-limited/i.test(String(err.message || ''))
+        ? `${err.message}<br><br>OpenRouter has rate-limited this model. Choose Gemini or change the OpenRouter model in Keys, then run again.`
+        : err.message;
+      s.bodyEl.innerHTML = `<span style="color:#ff4466">${detail.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/&lt;br&gt;/g, '<br>')}</span>`;
       s.setError('');
       setStatus('Error', false);
       showNotif('Error: ' + err.message.slice(0,80), 'error');
@@ -175,7 +179,11 @@ You MUST respond with a JSON object only (no markdown, no explanation outside JS
 }
 
 Rules:
-- Include the core evidence steps: search + code + analysis
+- Decide whether web research is needed based on the question and available context.
+- Use the search tool for current facts, external evidence, named entities, market/weather/news/public data, or claims that need citations.
+- When web research is needed, include exactly one search action near the beginning of the plan and use its results in later actions.
+- Do not use the search tool for purely self-contained calculations that can be answered from the user's supplied inputs.
+- Include the core evidence steps: code + analysis, and include search whenever the question requires external evidence
 - You may add additional custom analytical boxes whenever the question needs them
 - Custom tools are encouraged for domain-specific outputs such as weather model, risk lens, optimization box, cost simulator, financial stress test, market comparator, or scenario battle card
 - If map annotations exist, ALWAYS include a map action with specific per-location analysis
@@ -307,7 +315,7 @@ async function _toolCode(action, memory) {
   const searchCtxSnippet = memory.searchResults.map(s=>s.context).join('\n').slice(0,600);
   const prevOutputs = memory.codeRuns.map((r,i)=>`# Previous run ${i+1} output:\n# ${r.output.slice(0,200).replace(/\n/g,'\n# ')}`).join('\n');
 
-  const codePrompt = `You are writing Python for SYTH's code sandbox.
+  const codePrompt = `You are writing JavaScript that runs directly in the browser for SYTH.
 
 TASK: ${action.instruction}
 
@@ -318,35 +326,30 @@ ${searchCtxSnippet ? `WEB RESEARCH CONTEXT:\n${searchCtxSnippet}\n` : ''}
 ${prevOutputs ? `PREVIOUS CODE OUTPUTS (build on these):\n${prevOutputs}\n` : ''}
 
 RULES:
-- Use any relevant Python stdlib + numpy + scipy + math + json + collections + requests
-- If the task involves weather, live conditions, public datasets, or scraping, fetch actual live values in the sandbox using requests/http and print the exact result
-- You MAY use haversine formula for geographic distance calculations between coordinates
+- Use standard browser JavaScript and built-in Math, JSON, Array, Object, and Date APIs
+- If the task involves live web data, use fetch when the browser permits it and print the exact result
+- You MAY use the haversine formula for geographic distance calculations between coordinates
 - For map data: use the exact lat/lng coordinates provided above
 - Print ALL results with clear labels
 - Include location-specific outputs if map data is provided (by place name, not just coords)
 - Do not invent numbers or percentages without a reasoned calculation from the data
-- No external file I/O, no matplotlib (can't display), no pip installs
-- Return ONLY raw Python — no markdown fences, no comments starting with #! 
+- No external file I/O or package imports
+- Return ONLY executable raw JavaScript — no markdown fences, no prose, no sample output, and no text after the final statement
+- Async code is allowed; use await for fetch calls so all results are printed before finishing
 - Max 60 lines`;
 
   updateThinking('Generating code…');
   let code = await geminiAsk(codePrompt, () => _abort, 2048);
-  code = code.replace(/```python\n?/gi,'').replace(/```\n?/g,'').trim();
+  code = code.replace(/```(?:javascript|js)?\n?/gi,'').replace(/```\n?/g,'').trim();
   _chk();
 
-  updateThinking(`Executing in E2B sandbox (run #${runIdx})…`);
+  updateThinking(`Running JavaScript in browser (run #${runIdx})…`);
   const result  = await e2bRunCode(code);
   const output  = result.stdout || result.stderr || 'No output';
 
-  const statusLabel = result.live
-    ? `E2B sandbox: ${result.sandboxId}`
-    : `Simulated locally — E2B unavailable`;
+  const statusLabel = 'Browser JavaScript';
 
-  sec.bodyEl.innerHTML = buildSandboxBlock(code, output, 'Python', statusLabel);
-  if (!result.live) {
-    sec.bodyEl.innerHTML += `<div style="margin-top:10px;color:#ffb4c0;font-size:12px;">⚠️ ${escHtml(result.error || 'Sandbox creation failed. The app is using local simulation only.')}</div>`;
-    showNotif('E2B sandbox unavailable — local simulation is running', 'info', 6000);
-  }
+  sec.bodyEl.innerHTML = buildSandboxBlock(code, output, 'JavaScript', statusLabel);
   sec.setDone(`${output.split('\n').length} lines output`);
   memory.codeRuns.push({ code, output, live: !!result.live, error: result.error || '' });
   removeThinkingBar();
@@ -659,7 +662,17 @@ function _defaultActions(memory) {
       instruction:`Analyse these specific locations: ${memory.annotations.map(a=>a.placeName||a.state||('Lat '+a.latlng.lat.toFixed(3))).join(', ')}. Show heatmap/route. Reference each location by its real name.`,
     });
   }
+
   return actions;
+}
+
+function _ensureDeepResearchActions(actions, memory) {
+  const planned = Array.isArray(actions) ? actions : [];
+  const required = _defaultActions(memory).filter(action =>
+    ['analyze', 'scenarios', 'charts', 'report'].includes(action.tool)
+  );
+  const tools = new Set(planned.map(action => action.tool));
+  return planned.concat(required.filter(action => !tools.has(action.tool)));
 }
 
 function _fallbackScenarios() {

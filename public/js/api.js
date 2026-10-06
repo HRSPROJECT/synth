@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════
-   SYTH — api.js   (Gemini 2.5 Flash + Tavily + E2B)
+   SYTH — api.js   (Gemini 2.5 Flash + Tavily)
    ═══════════════════════════════════════════════ */
 'use strict';
 
@@ -21,17 +21,44 @@ function getActiveModel() {
   return SYTH_KEYS.provider === 'openrouter' ? 'poolside/laguna-s-2.1:free' : 'gemini-2.5-flash';
 }
 
+let _openRouterCooldownUntil = 0;
+let _lastProviderRequestAt = 0;
+
+async function waitForRateLimit(ms, attempt) {
+  const delay = Math.max(0, ms);
+  _openRouterCooldownUntil = Math.max(_openRouterCooldownUntil, Date.now() + delay);
+  const end = _openRouterCooldownUntil;
+  while (Date.now() < end) {
+    const seconds = Math.ceil((end - Date.now()) / 1000);
+    if (typeof showNotif === 'function') {
+      showNotif(`AI provider is rate-limited. Retrying in ${seconds}s (attempt ${attempt + 1}/3)…`, 'info', 1500);
+    }
+    await new Promise(resolve => setTimeout(resolve, Math.min(1000, end - Date.now())));
+  }
+}
+
 async function withRetry(operation, { retries = 3, baseDelay = 700, maxDelay = 4000 } = {}) {
   let lastError = null;
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
+      if (SYTH_KEYS.provider === 'openrouter' && Date.now() < _openRouterCooldownUntil) {
+        await waitForRateLimit(_openRouterCooldownUntil - Date.now(), attempt);
+      }
+      const spacing = SYTH_KEYS.provider === 'openrouter' ? 1800 : 500;
+      const wait = spacing - (Date.now() - _lastProviderRequestAt);
+      if (wait > 0) await new Promise(resolve => setTimeout(resolve, wait));
+      _lastProviderRequestAt = Date.now();
       return await operation();
     } catch (err) {
       lastError = err;
       const retryable = /fetch|network|429|500|502|503|504|timeout|ECONNRESET|temporar|Failed to fetch/i.test(String(err?.message || err));
-      if (!retryable || attempt === retries - 1) throw err;
-      const delay = Math.min(baseDelay * (2 ** attempt), maxDelay) + Math.random() * 250;
-      await new Promise(resolve => setTimeout(resolve, delay));
+      if (!retryable || attempt === retries - 1 || err?.rateLimited) throw err;
+      const delay = Number(err?.retryAfterMs) || Math.min(baseDelay * (2 ** attempt), maxDelay);
+      if (err?.rateLimited) {
+        await waitForRateLimit(delay, attempt);
+      } else {
+        await new Promise(resolve => setTimeout(resolve, delay + Math.random() * 250));
+      }
     }
   }
   throw lastError;
@@ -47,7 +74,7 @@ function setKeys(gemini, tavily, e2b, model = 'gemini-2.5-flash', provider = 'ge
 }
 function hasKeys() {
   const aiKey = getActiveAiKey();
-  return !!(aiKey && SYTH_KEYS.tavily && SYTH_KEYS.e2b);
+  return !!(aiKey && SYTH_KEYS.tavily);
 }
 
 /* ── AI (Gemini/OpenRouter) STREAM ───────────────────────────────────── */
@@ -74,23 +101,44 @@ async function geminiStream(prompt, onChunk = null, abortCheck = null, maxTokens
           messages: [{ role: 'user', content: prompt }],
           temperature: 0.7,
           max_tokens: Math.min(maxTokens, 16384),
-          reasoning: { enabled: true }
+          reasoning: { enabled: false }
         })
       });
 
       if (!res.ok) {
         const t = await res.text();
-        throw new Error(`OpenRouter ${res.status}: ${t.slice(0, 300)}`);
+        const error = new Error(`OpenRouter ${res.status}: ${t.slice(0, 300)}`);
+        if (res.status === 429) {
+          const retryAfterHeader = res.headers.get('retry-after');
+          const retryAfterSeconds = Number(retryAfterHeader);
+          const retryAfterDate = Date.parse(retryAfterHeader || '');
+          error.rateLimited = true;
+          error.retryAfterMs = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
+            ? retryAfterSeconds * 1000
+            : (Number.isFinite(retryAfterDate) && retryAfterDate > Date.now()
+              ? retryAfterDate - Date.now()
+              : 5000);
+        }
+        throw error;
       }
 
       const data = await res.json();
       const message = data?.choices?.[0]?.message;
-      const text = message && typeof message.content === 'string'
+      const contentText = message && typeof message.content === 'string'
         ? message.content
         : (Array.isArray(message?.content) ? message.content.map(part => typeof part === 'string' ? part : (part?.text || '')).join('') : '');
+      const reasoningText = typeof message?.reasoning === 'string'
+        ? message.reasoning
+        : (typeof message?.reasoning_content === 'string'
+          ? message.reasoning_content
+          : (Array.isArray(message?.reasoning_details)
+          ? message.reasoning_details.map(part => part?.text || '').join('')
+          : ''));
+      const text = contentText.trim() || reasoningText.trim();
 
       if (onChunk && text) onChunk(text, text);
-      return text || '';
+      if (!text) throw new Error('AI returned an empty response. Try another model or disable reasoning for this model.');
+      return text;
     }
 
     const model = getActiveModel();
@@ -146,68 +194,7 @@ async function tavilySearch(query, maxResults = 6) {
   }, { retries: 3, baseDelay: 900 });
 }
 
-/* ── E2B ─────────────────────────────────────────────────────────────── */
-function normalizeE2BExecution(execution) {
-  const stdoutArr = Array.isArray(execution?.logs?.stdout) ? execution.logs.stdout : [];
-  const stderrArr = Array.isArray(execution?.logs?.stderr) ? execution.logs.stderr : [];
-  const stdoutText = [execution?.stdout, execution?.text, stdoutArr.join('\n')]
-    .filter(v => typeof v === 'string' && v.trim())
-    .join('\n')
-    .trim();
-  const stderrText = [execution?.stderr, stderrArr.join('\n')]
-    .filter(v => typeof v === 'string' && v.trim())
-    .join('\n')
-    .trim();
-
-  return {
-    stdout: stdoutText || '',
-    stderr: stderrText || '',
-    sandboxId: execution?.sandboxId || 'e2b',
-    live: true,
-    error: execution?.error || '',
-  };
-}
-
-async function e2bRunCommand(command, timeout = 45) {
-  try {
-    const res = await fetch('/api/e2b', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        kind: 'command',
-        command,
-        timeout,
-        apiKey: SYTH_KEYS.e2b,
-      })
-    });
-
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data?.error || `E2B proxy request failed (${res.status})`);
-    }
-
-    const normalized = normalizeE2BExecution(data);
-    return {
-      stdout: normalized.stdout || '',
-      stderr: normalized.stderr || '',
-      sandboxId: data.sandboxId || 'e2b',
-      live: !!data.live,
-      error: data.error || ''
-    };
-  } catch (err) {
-    const msg = String(err?.message || err || 'Unknown sandbox error');
-    console.warn('[E2B proxy fallback]', msg);
-    return {
-      stdout: `Live sandbox unavailable. Falling back to local simulation.\nReason: ${msg}`.slice(0, 1200),
-      stderr: '',
-      sandboxId: 'simulated',
-      live: false,
-      error: msg,
-    };
-  }
-}
-
-function runLocalJavaScriptSandbox(code) {
+async function runLocalJavaScriptSandbox(code) {
   const clean = String(code || '').trim();
   if (!clean) {
     return { stdout: 'No code supplied.', stderr: '', sandboxId: 'local-js', live: false, error: 'No code supplied.' };
@@ -222,8 +209,8 @@ function runLocalJavaScriptSandbox(code) {
   };
 
   try {
-    const runner = new Function('console', 'Math', 'Date', 'JSON', 'Array', 'Object', 'Number', 'String', 'Boolean', 'RegExp', 'setTimeout', 'clearTimeout', code);
-    runner(safeConsole, Math, Date, JSON, Array, Object, Number, String, Boolean, RegExp, setTimeout, clearTimeout);
+    const runner = new Function('console', 'Math', 'Date', 'JSON', 'Array', 'Object', 'Number', 'String', 'Boolean', 'RegExp', 'fetch', 'setTimeout', 'clearTimeout', `return (async () => { ${code} })();`);
+    await runner(safeConsole, Math, Date, JSON, Array, Object, Number, String, Boolean, RegExp, fetch, setTimeout, clearTimeout);
     return {
       stdout: logs.stdout.join('\n'),
       stderr: logs.stderr.join('\n'),
@@ -244,53 +231,15 @@ function runLocalJavaScriptSandbox(code) {
 }
 
 async function e2bRunCode(code) {
-  try {
-    const clean = String(code || '').trim();
-    if (!clean) return { stdout: 'No code supplied.', stderr: '', sandboxId: 'simulated', live: false, error: 'No code supplied.' };
-
-    if (!SYTH_KEYS.e2b) {
-      return runLocalJavaScriptSandbox(clean);
-    }
-
-    const res = await fetch('/api/e2b', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        kind: 'code',
-        code: clean,
-        apiKey: SYTH_KEYS.e2b,
-        timeout: 45,
-      })
-    });
-
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data?.error || `E2B proxy request failed (${res.status})`);
-    }
-
-    if (data.live === false) {
-      return {
-        stdout: data.stdout || _simOutput(code),
-        stderr: data.stderr || '',
-        sandboxId: data.sandboxId || 'simulated',
-        live: false,
-        error: data.error || 'E2B unavailable'
-      };
-    }
-
-    const normalized = normalizeE2BExecution(data);
-    return {
-      stdout: normalized.stdout || '',
-      stderr: normalized.stderr || '',
-      sandboxId: data.sandboxId || 'e2b',
-      live: true,
-      error: ''
-    };
-  } catch (err) {
-    const msg = String(err?.message || err || 'Unknown sandbox error');
-    console.warn('[E2B fallback]', msg);
-    return runLocalJavaScriptSandbox(code);
-  }
+  const clean = String(code || '').trim()
+    .replace(/^```(?:javascript|js)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .split(/\n\s*(?:Sample output|Expected output|Output)\s*:?\s*/i)[0]
+    .trim();
+  const executable = /^\s*\(\s*async\s*\(\s*\)\s*=>/.test(clean)
+    ? clean.replace(/^\s*\(/, 'await (')
+    : clean;
+  return runLocalJavaScriptSandbox(executable);
 }
 
 function _simOutput(code) {
