@@ -7,7 +7,7 @@
 
 /* ── NOTIFICATION ─────────────────────────────────────────────────── */
 let _notifTimer = null;
-function showNotif(msg, type = 'info', dur = 3500) {
+export function showNotif(msg, type = 'info', dur = 3500) {
   const el = document.getElementById('notif');
   if (!el) return;
   el.textContent = msg;
@@ -225,7 +225,7 @@ function buildSearchHTML(data) {
 }
 
 /* ── PARTICLES ───────────────────────────────────────────────────── */
-function initParticles() {
+export function initParticles() {
   const c = document.getElementById('particles');
   if (!c) return;
   for (let i = 0; i < 22; i++) {

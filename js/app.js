@@ -6,6 +6,13 @@
    ═══════════════════════════════════════════════ */
 'use strict';
 
+import { setKeys, getActiveModel, SYTH_KEYS, getActiveAiKey } from './api.js';
+import { showNotif, initParticles } from './ui.js';
+import { initInputMap, invalidateInputMap, setMapTool, clearMapAnnotations } from './map.js';
+import { addFiles } from './files.js';
+import { exportPDF, exportTXT, exportDOCX } from './export.js';
+import { runExperiment, stopExperiment } from './agent.js';
+
 const LS_KEY = 'syth_api_keys_v3';
 
 document.addEventListener('DOMContentLoaded', () => {

@@ -3,7 +3,7 @@
    ═══════════════════════════════════════════════ */
 'use strict';
 
-const SYTH_KEYS = {
+export const SYTH_KEYS = {
   gemini: '',
   tavily: '',
   e2b: '',
@@ -12,11 +12,11 @@ const SYTH_KEYS = {
   openrouter: ''
 };
 
-function getActiveAiKey() {
+export function getActiveAiKey() {
   return SYTH_KEYS.provider === 'openrouter' ? (SYTH_KEYS.openrouter || '') : (SYTH_KEYS.gemini || '');
 }
 
-function getActiveModel() {
+export function getActiveModel() {
   if (SYTH_KEYS.model && SYTH_KEYS.model.trim()) return SYTH_KEYS.model.trim();
   return SYTH_KEYS.provider === 'openrouter' ? 'poolside/laguna-s-2.1:free' : 'gemini-2.5-flash';
 }
@@ -37,7 +37,7 @@ async function withRetry(operation, { retries = 3, baseDelay = 700, maxDelay = 4
   throw lastError;
 }
 
-function setKeys(gemini, tavily, e2b, model = 'gemini-2.5-flash', provider = 'gemini', openrouter = '') {
+export function setKeys(gemini, tavily, e2b, model = 'gemini-2.5-flash', provider = 'gemini', openrouter = '') {
   SYTH_KEYS.gemini = gemini || '';
   SYTH_KEYS.tavily = tavily || '';
   SYTH_KEYS.e2b    = e2b || '';
